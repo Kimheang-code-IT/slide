@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solving IT-Related Problems</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  :root {
+    --bg: #060b14;
+    --bg-slide: #0a1020;
+    --fg: #e8edf5;
+    --muted: #5a6a85;
+    --accent: #00ff88;
+    --accent-dim: rgba(0,255,136,0.12);
+    --accent2: #00d4ff;
+    --card: rgba(14,22,40,0.85);
+    --border: rgba(0,255,136,0.15);
+    --danger: #ff4466;
+    --warning: #ffaa00;
+    --radius: 14px;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  /* Background Canvas */
+  #bgCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Ambient glow blobs */
+  .glow-blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow-blob.g1 { width: 500px; height: 500px; background: var(--accent); top: -150px; left: -100px; }
+  .glow-blob.g2 { width: 400px; height: 400px; background: var(--accent2); bottom: -100px; right: -80px; }
+  .glow-blob.g3 { width: 300px; height: 300px; background: #8855ff; top: 50%; left: 60%; opacity: 0.08; }
+
+  /* Progress Bar */
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    z-index: 100;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 0 0 20px var(--accent);
+  }
+
+  /* Slide Counter */
+  .slide-counter {
+    position: fixed;
+    top: 24px; right: 32px;
+    z-index: 100;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .slide-counter .current {
+    color: var(--accent);
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  /* Dot Navigation */
+  .dot-nav {
+    position: fixed;
+    right: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dot-nav button {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s;
+    padding: 0;
+  }
+  .dot-nav button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent);
+    transform: scale(1.3);
+  }
+  .dot-nav button:hover:not(.active) {
+    border-color: var(--accent);
+    transform: scale(1.15);
+  }
+
+  /* Navigation Arrows */
+  .nav-arrows {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .nav-arrows button {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+  }
+  .nav-arrows button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-dim);
+    transform: scale(1.08);
+  }
+  .nav-arrows button:disabled {
+    opacity: 0.25;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border);
+    color: var(--muted);
+  }
+  .nav-hint {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin: 0 8px;
+  }
+
+  /* Slides Container */
+  .slides-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    z-index: 1;
+  }
+
+  .slide {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 80px;
+    opacity: 0;
+    transform: translateX(60px);
+    transition: all 0.6s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+  .slide.exit-left {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  .slide-inner {
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  /* Typography */
+  h1, h2, h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.15;
+  }
+
+  .slide-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .slide-label::before {
+    content: '';
+    width: 24px; height: 2px;
+    background: var(--accent);
+  }
+
+  .slide-title {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 700;
+    color: var(--fg);
+    margin-bottom: 20px;
+  }
+  .slide-title .accent { color: var(--accent); }
+  .slide-title .accent2 { color: var(--accent2); }
+
+  .slide-subtitle {
+    font-size: clamp(16px, 2vw, 22px);
+    color: var(--muted);
+    font-weight: 300;
+    margin-bottom: 40px;
+    max-width: 700px;
+  }
+
+  /* Cards Grid */
+  .cards-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 10px;
+  }
+  .cards-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    backdrop-filter: blur(12px);
+    transition: all 0.35s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.35s;
+  }
+  .card:hover {
+    border-color: rgba(0,255,136,0.35);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,255,136,0.08);
+  }
+  .card:hover::before { opacity: 1; }
+
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--accent-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .card-icon.blue { background: rgba(0,212,255,0.12); color: var(--accent2); }
+  .card-icon.red { background: rgba(255,68,102,0.12); color: var(--danger); }
+  .card-icon.yellow { background: rgba(255,170,0,0.12); color: var(--warning); }
+
+  .card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Process Steps */
+  .process-steps {
+    display: flex;
+    gap: 0;
+    margin-top: 20px;
+    position: relative;
+  }
+  .process-steps::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 30px;
+    right: 30px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0.3;
+  }
+  .step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .step-num {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg-slide);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0 auto 12px;
+    transition: all 0.3s;
+  }
+  .step:hover .step-num {
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 24px rgba(0,255,136,0.3);
+  }
+  .step-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-desc {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0 8px;
+  }
+
+  /* Why Chain */
+  .why-chain {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .why-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: var(--card);
+    border-left: 3px solid var(--accent);
+    transition: all 0.3s;
+  }
+  .why-item:nth-child(odd) { border-left-color: var(--accent); }
+  .why-item:nth-child(even) { border-left-color: var(--accent2); }
+  .why-item:hover { background: rgba(0,255,136,0.05); }
+  .why-arrow {
+    font-size: 12px;
+    color: var(--accent);
+    text-align: center;
+    padding: 4px 0;
+    padding-left: 20px;
+  }
+  .why-item .why-q {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .why-item .why-a {
+    font-size: 14px;
+    color: var(--fg);
+  }
+
+  /* Decision comparison */
+  .decision-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .decision-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .decision-box.fast { border-top: 3px solid var(--warning); }
+  .decision-box.permanent { border-top: 3px solid var(--accent); }
+  .decision-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .decision-box.fast .decision-tag { color: var(--warning); }
+  .decision-box.permanent .decision-tag { color: var(--accent); }
+  .decision-box h3 { font-size: 18px; margin-bottom: 8px; }
+  .decision-box p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .decision-meta {
+    margin-top: 14px;
+    display: flex;
+    gap: 16px;
+  }
+  .meta-item {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .meta-item i { font-size: 12px; }
+
+  /* Tools list */
+  .tools-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 20px;
+  }
+  .tool-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 22px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.3s;
+  }
+  .tool-item:hover {
+    border-color: var(--accent);
+    transform: translateX(4px);
+  }
+  .tool-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--accent);
+    min-width: 120px;
+  }
+  .tool-desc {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .tool-icon {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    background: var(--accent-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  /* Case study steps */
+  .case-steps {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .case-step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .case-step:hover {
+    border-color: var(--accent);
+    background: rgba(0,255,136,0.04);
+  }
+  .case-step-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .case-step-text {
+    font-size: 15px;
+  }
+  .case-step-text strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .case-step .case-icon {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 16px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .case-step:hover .case-icon { opacity: 1; color: var(--accent); }
+
+  /* Best practices */
+  .bp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .bp-item {
+    display: flex;
+    gap: 16px;
+    padding: 22px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: all 0.3s;
+  }
+  .bp-item:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .bp-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: rgba(0,255,136,0.2);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .bp-item:hover .bp-num { color: rgba(0,255,136,0.5); }
+  .bp-text h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .bp-text p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* Title slide specific */
+  .title-slide .slide-inner {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+  }
+  .title-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    background: var(--accent-dim);
+  }
+  .title-main {
+    font-size: clamp(40px, 6.5vw, 80px);
+    font-weight: 700;
+    line-height: 1.05;
+    margin-bottom: 20px;
+  }
+  .title-sub {
+    font-size: clamp(18px, 2.5vw, 26px);
+    color: var(--muted);
+    font-weight: 300;
+    margin-bottom: 48px;
+  }
+  .title-meta {
+    display: flex;
+    gap: 32px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .title-meta span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .title-meta i { color: var(--accent); font-size: 13px; }
+
+  /* Conclusion slide */
+  .conclusion-points {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 20px;
+    margin-bottom: 40px;
+  }
+  .conclusion-point {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 16px;
+    transition: all 0.3s;
+  }
+  .conclusion-point:hover {
+    border-color: var(--accent);
+    transform: translateX(6px);
+  }
+  .conclusion-point i {
+    color: var(--accent);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .final-quote {
+    text-align: center;
+    padding: 32px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--accent-dim);
+    position: relative;
+  }
+  .final-quote p {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .final-quote .quote-marks {
+    position: absolute;
+    font-size: 60px;
+    color: rgba(0,255,136,0.15);
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  .final-quote .quote-marks.left { top: 4px; left: 20px; }
+  .final-quote .quote-marks.right { bottom: -12px; right: 20px; }
+
+  /* Split layout */
+  .split-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .split-left, .split-right {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Criteria badges */
+  .criteria-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .criteria-badge {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+  }
+  .criteria-badge:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .criteria-badge i { font-size: 13px; }
+
+  /* Method pills */
+  .method-pills {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .method-pill {
+    padding: 10px 22px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+    transition: all 0.3s;
+  }
+  .method-pill:hover {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .method-pill.alt {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(0,212,255,0.1);
+  }
+  .method-pill.alt:hover {
+    background: var(--accent2);
+    color: var(--bg);
+  }
+
+  /* Animated entry for slide elements */
+  .slide.active .anim-up {
+    animation: animUp 0.6s ease forwards;
+  }
+  .slide.active .anim-up.d1 { animation-delay: 0.1s; }
+  .slide.active .anim-up.d2 { animation-delay: 0.2s; }
+  .slide.active .anim-up.d3 { animation-delay: 0.3s; }
+  .slide.active .anim-up.d4 { animation-delay: 0.4s; }
+  .slide.active .anim-up.d5 { animation-delay: 0.5s; }
+
+  .anim-up {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  @keyframes animUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,255,136,0.1); }
+    50% { box-shadow: 0 0 40px rgba(0,255,136,0.25); }
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .slide { padding: 40px 24px; }
+    .cards-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    .split-layout { grid-template-columns: 1fr; gap: 24px; }
+    .decision-compare { grid-template-columns: 1fr; }
+    .tools-list { grid-template-columns: 1fr; }
+    .bp-grid { grid-template-columns: 1fr; }
+    .process-steps { flex-wrap: wrap; gap: 12px; }
+    .process-steps::before { display: none; }
+    .step { min-width: 80px; }
+    .dot-nav { display: none; }
+    .title-meta { flex-direction: column; gap: 8px; align-items: center; }
+  }
+
+  @media (max-width: 600px) {
+    .cards-grid.cols-2 { grid-template-columns: 1fr; }
+    .slide-title { font-size: 28px; }
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .slide { transition: opacity 0.3s; transform: none !important; }
+    .slide.active { transform: none !important; }
+    .slide.exit-left { transform: none !important; }
+    .anim-up { animation: none !important; opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="glow-blob g1"></div>
+<div class="glow-blob g2"></div>
+<div class="glow-blob g3"></div>
+
+<div class="progress-bar" id="progressBar"></div>
+<div class="slide-counter">
+  <span class="current" id="counterCurrent">01</span>
+  <span>/ 10</span>
+</div>
+
+<nav class="dot-nav" id="dotNav" aria-label="Slide navigation"></nav>
+
+<div class="nav-arrows">
+  <button id="btnPrev" aria-label="Previous slide"><i class="fa-solid fa-chevron-left"></i></button>
+  <span class="nav-hint">Arrow Keys</span>
+  <button id="btnNext" aria-label="Next slide"><i class="fa-solid fa-chevron-right"></i></button>
+</div>
+
+<main class="slides-wrapper" id="slidesWrapper">
+
+  <!-- SLIDE 1: Title -->
+  <section class="slide title-slide active" data-slide="0">
+    <div class="slide-inner">
+      <div class="title-badge anim-up"><i class="fa-solid fa-terminal"></i> Problem-Solving & Critical Thinking</div>
+      <h1 class="title-main anim-up d1">Solving <span class="accent">IT-Related</span> Problems</h1>
+      <p class="title-sub anim-up d2">A structured approach to diagnosing, analyzing, and resolving technical issues efficiently</p>
+      <div class="title-meta anim-up d3">
+        <span><i class="fa-solid fa-user"></i> Your Name</span>
+        <span><i class="fa-solid fa-graduation-cap"></i> IT Class</span>
+        <span><i class="fa-solid fa-calendar"></i> 2025</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 2: Introduction -->
+  <section class="slide" data-slide="1">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Introduction</div>
+      <h2 class="slide-title anim-up d1">Why <span class="accent">Structure</span> Matters</h2>
+      <p class="slide-subtitle anim-up d2">IT problems are inevitable. The difference between a good technician and a great one is how they approach the unknown.</p>
+      <div class="cards-grid cols-2 anim-up d3">
+        <div class="card">
+          <div class="card-icon"><i class="fa-solid fa-bolt"></i></div>
+          <h3>Problems Are Daily</h3>
+          <p>Network outages, app crashes, hardware failures, and security breaches happen every single day in IT environments.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon blue"><i class="fa-solid fa-brain"></i></div>
+          <h3>Structured Thinking</h3>
+          <p>A systematic approach ensures you address the real issue, not just the symptom. Logic replaces guesswork.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon red"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <h3>Random Fixing Wastes Time</h3>
+          <p>Trying random solutions without understanding the cause leads to wasted hours, frustrated users, and recurring issues.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon yellow"><i class="fa-solid fa-bullseye"></i></div>
+          <h3>The Goal</h3>
+          <p>Solve problems <strong style="color:var(--fg)">fast</strong> and <strong style="color:var(--fg)">correctly</strong> — the first time. Speed without accuracy is useless.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 3: Types of IT Problems -->
+  <section class="slide" data-slide="2">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Categories</div>
+      <h2 class="slide-title anim-up d1">Types of <span class="accent2">IT Problems</span></h2>
+      <p class="slide-subtitle anim-up d2">Understanding the category helps narrow down the diagnostic path immediately.</p>
+      <div class="cards-grid cols-4 anim-up d3">
+        <div class="card">
+          <div class="card-icon"><i class="fa-solid fa-wifi"></i></div>
+          <h3>Network Issues</h3>
+          <p>No internet, slow connections, DNS failures, packet loss, VPN drops</p>
+        </div>
+        <div class="card">
+          <div class="card-icon blue"><i class="fa-solid fa-bug"></i></div>
+          <h3>Software Errors</h3>
+          <p>Application crashes, compatibility issues, update failures, runtime exceptions</p>
+        </div>
+        <div class="card">
+          <div class="card-icon red"><i class="fa-solid fa-hard-drive"></i></div>
+          <h3>Hardware Failure</h3>
+          <p>PC won't boot, disk errors, overheating, dead components, BSOD</p>
+        </div>
+        <div class="card">
+          <div class="card-icon yellow"><i class="fa-solid fa-shield-halved"></i></div>
+          <h3>Security Problems</h3>
+          <p>Malware infections, unauthorized access, data breaches, phishing attacks</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 4: Problem-Solving Process -->
+  <section class="slide" data-slide="3">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Framework</div>
+      <h2 class="slide-title anim-up d1">The <span class="accent">5-Step</span> Process</h2>
+      <p class="slide-subtitle anim-up d2">A repeatable workflow that works for any IT problem, from simple to complex.</p>
+      <div class="process-steps anim-up d3">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-label">Identify</div>
+          <div class="step-desc">Define the problem clearly. What exactly is broken?</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-label">Analyze</div>
+          <div class="step-desc">Investigate the cause. Gather data and evidence.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-label">Solve</div>
+          <div class="step-desc">Find and implement a solution. Prioritize options.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-label">Test</div>
+          <div class="step-desc">Verify the fix works. Check for side effects.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-label">Monitor</div>
+          <div class="step-desc">Watch for recurrence. Document everything.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 5: Root Cause Analysis -->
+  <section class="slide" data-slide="4">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Deep Dive</div>
+      <h2 class="slide-title anim-up d1">Root Cause <span class="accent">Analysis</span></h2>
+      <p class="slide-subtitle anim-up d2">Don't treat symptoms — find why the problem exists in the first place.</p>
+      <div class="split-layout anim-up d3">
+        <div class="split-left">
+          <p style="font-size:15px;color:var(--muted);margin-bottom:8px;">Proven methods:</p>
+          <div class="method-pills">
+            <div class="method-pill"><i class="fa-solid fa-arrow-down-1-9" style="margin-right:6px;"></i>5 Whys Technique</div>
+            <div class="method-pill alt"><i class="fa-solid fa-diagram-project" style="margin-right:6px;"></i>Fishbone Diagram</div>
+          </div>
+          <div class="criteria-row" style="margin-top:24px;">
+            <div class="criteria-badge"><i class="fa-solid fa-check" style="color:var(--accent)"></i> Ask "why" repeatedly</div>
+            <div class="criteria-badge"><i class="fa-solid fa-check" style="color:var(--accent)"></i> Map cause categories</div>
+            <div class="criteria-badge"><i class="fa-solid fa-check" style="color:var(--accent)"></i> Never stop at surface</div>
+          </div>
+        </div>
+        <div class="split-right">
+          <p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Example: PC No Internet</p>
+          <div class="why-chain">
+            <div class="why-item">
+              <span class="why-q">Why?</span>
+              <span class="why-a">No IP address assigned</span>
+            </div>
+            <div class="why-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+            <div class="why-item">
+              <span class="why-q">Why?</span>
+              <span class="why-a">DHCP server not responding</span>
+            </div>
+            <div class="why-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+            <div class="why-item">
+              <span class="why-q">Why?</span>
+              <span class="why-a">DHCP service crashed after update</span>
+            </div>
+            <div class="why-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+            <div class="why-item">
+              <span class="why-q">Fix</span>
+              <span class="why-a" style="color:var(--accent)">Restart DHCP service &amp; rollback update</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 6: Decision Making -->
+  <section class="slide" data-slide="5">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Strategy</div>
+      <h2 class="slide-title anim-up d1">Decision <span class="accent2">Making</span></h2>
+      <p class="slide-subtitle anim-up d2">Multiple solutions may exist. Choose wisely based on context and constraints.</p>
+      <div class="criteria-row anim-up d2">
+        <div class="criteria-badge"><i class="fa-solid fa-gauge-high" style="color:var(--warning)"></i> Fast vs Permanent</div>
+        <div class="criteria-badge"><i class="fa-solid fa-coins" style="color:var(--accent)"></i> Cost vs Benefit</div>
+        <div class="criteria-badge"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i> Risk Level</div>
+      </div>
+      <div class="decision-compare anim-up d3">
+        <div class="decision-box fast">
+          <div class="decision-tag"><i class="fa-solid fa-bolt"></i> Quick Fix</div>
+          <h3>Restart the Server</h3>
+          <p>Immediate recovery. Gets users back online fast. But the underlying bug remains and may trigger again.</p>
+          <div class="decision-meta">
+            <div class="meta-item"><i class="fa-solid fa-clock"></i> 5 minutes</div>
+            <div class="meta-item"><i class="fa-solid fa-rotate"></i> May recur</div>
+            <div class="meta-item"><i class="fa-solid fa-shield-halved"></i> Low risk</div>
+          </div>
+        </div>
+        <div class="decision-box permanent">
+          <div class="decision-tag"><i class="fa-solid fa-wrench"></i> Long-Term Fix</div>
+          <h3>Fix the System Bug</h3>
+          <p>Identify the root cause in code or config. Apply a proper patch. Prevents future occurrences entirely.</p>
+          <div class="decision-meta">
+            <div class="meta-item"><i class="fa-solid fa-clock"></i> 2–4 hours</div>
+            <div class="meta-item"><i class="fa-solid fa-check-circle"></i> Permanent</div>
+            <div class="meta-item"><i class="fa-solid fa-shield-halved"></i> Medium risk</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 7: Tools -->
+  <section class="slide" data-slide="6">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Toolkit</div>
+      <h2 class="slide-title anim-up d1">Essential <span class="accent">Tools</span></h2>
+      <p class="slide-subtitle anim-up d2">The right tool turns hours of guessing into minutes of precise diagnosis.</p>
+      <div class="tools-list anim-up d3">
+        <div class="tool-item">
+          <div class="tool-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+          <div class="tool-name">Ping</div>
+          <div class="tool-desc">Check network reachability and latency to any host</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-icon" style="background:rgba(0,212,255,0.12);color:var(--accent2);"><i class="fa-solid fa-chart-line"></i></div>
+          <div class="tool-name" style="color:var(--accent2);">Task Manager</div>
+          <div class="tool-desc">Monitor CPU, RAM, disk usage and kill unresponsive processes</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-icon" style="background:rgba(255,170,0,0.12);color:var(--warning);"><i class="fa-solid fa-scroll"></i></div>
+          <div class="tool-name" style="color:var(--warning);">System Logs</div>
+          <div class="tool-desc">Read error logs, event viewer, and crash reports for clues</div>
+        </div>
+        <div class="tool-item">
+          <div class="tool-icon" style="background:rgba(255,68,102,0.12);color:var(--danger);"><i class="fa-solid fa-magnifying-glass"></i></div>
+          <div class="tool-name" style="color:var(--danger);">Google & Docs</div>
+          <div class="tool-desc">Search error codes, read official documentation and community forums</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 8: Case Study -->
+  <section class="slide" data-slide="7">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Case Study</div>
+      <h2 class="slide-title anim-up d1">Cannot Access <span class="accent">Website</span></h2>
+      <p class="slide-subtitle anim-up d2">A real-world walkthrough of systematic troubleshooting in action.</p>
+      <div class="case-steps anim-up d3">
+        <div class="case-step">
+          <div class="case-step-num">1</div>
+          <div class="case-step-text"><strong>Check internet connection</strong> — Can other websites load? Is the cable/WiFi connected?</div>
+          <i class="fa-solid fa-check case-icon"></i>
+        </div>
+        <div class="case-step">
+          <div class="case-step-num">2</div>
+          <div class="case-step-text"><strong>Ping the website</strong> — Open terminal and run <code style="background:var(--accent-dim);padding:2px 8px;border-radius:4px;font-size:13px;color:var(--accent);">ping example.com</code></div>
+          <i class="fa-solid fa-check case-icon"></i>
+        </div>
+        <div class="case-step">
+          <div class="case-step-num">3</div>
+          <div class="case-step-text"><strong>Check DNS resolution</strong> — Run <code style="background:var(--accent-dim);padding:2px 8px;border-radius:4px;font-size:13px;color:var(--accent);">nslookup example.com</code> to see if the domain resolves</div>
+          <i class="fa-solid fa-check case-icon"></i>
+        </div>
+        <div class="case-step">
+          <div class="case-step-num">4</div>
+          <div class="case-step-text"><strong>Restart router</strong> — Power cycle the router/modem, wait 30 seconds, test again</div>
+          <i class="fa-solid fa-check case-icon"></i>
+        </div>
+        <div class="case-step">
+          <div class="case-step-num">5</div>
+          <div class="case-step-text"><strong>Flush DNS cache</strong> — Run <code style="background:var(--accent-dim);padding:2px 8px;border-radius:4px;font-size:13px;color:var(--accent);">ipconfig /flushdns</code> to clear stale records</div>
+          <i class="fa-solid fa-check case-icon"></i>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 9: Best Practices -->
+  <section class="slide" data-slide="8">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Guidelines</div>
+      <h2 class="slide-title anim-up d1">Best <span class="accent2">Practices</span></h2>
+      <p class="slide-subtitle anim-up d2">Habits that separate professionals from amateurs in IT problem solving.</p>
+      <div class="bp-grid anim-up d3">
+        <div class="bp-item">
+          <div class="bp-num">01</div>
+          <div class="bp-text">
+            <h3>Follow the Steps</h3>
+            <p>Always use a structured process. Skipping steps leads to missed clues and wrong conclusions.</p>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-num">02</div>
+          <div class="bp-text">
+            <h3>Don't Guess Randomly</h3>
+            <p>Every action should be based on evidence. Random clicking makes things worse, not better.</p>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-num">03</div>
+          <div class="bp-text">
+            <h3>Document Everything</h3>
+            <p>Record what you found, what you tried, and what worked. Future you will thank present you.</p>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-num">04</div>
+          <div class="bp-text">
+            <h3>Learn from Mistakes</h3>
+            <p>Every failed attempt is data. Post-mortems turn failures into organizational knowledge.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLIDE 10: Conclusion -->
+  <section class="slide" data-slide="9">
+    <div class="slide-inner">
+      <div class="slide-label anim-up">Conclusion</div>
+      <h2 class="slide-title anim-up d1">Think Before <span class="accent">You Fix</span></h2>
+      <div class="conclusion-points anim-up d2">
+        <div class="conclusion-point">
+          <i class="fa-solid fa-microchip"></i>
+          <span>IT problems demand <strong style="color:var(--accent)">logic + process</strong>, not just technical skill</span>
+        </div>
+        <div class="conclusion-point">
+          <i class="fa-solid fa-magnifying-glass-chart"></i>
+          <span>Finding the <strong style="color:var(--accent2)">root cause</strong> is more valuable than any quick fix</span>
+        </div>
+        <div class="conclusion-point">
+          <i class="fa-solid fa-hourglass-half"></i>
+          <span>Good decisions <strong style="color:var(--warning)">save time</strong>, reduce cost, and prevent recurrence</span>
+        </div>
+      </div>
+      <div class="final-quote anim-up d3">
+        <span class="quote-marks left">"</span>
+        <p>Think before you fix</p>
+        <span class="quote-marks right">"</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ========== Background Particle Network ==========
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const PARTICLE_COUNT = 60;
+  const CONNECT_DIST = 150;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  // Create particles
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: Math.random() * 1.5 + 0.5
+    });
+  }
+
+  function drawParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw connections
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECT_DIST) {
+          const alpha = (1 - dist / CONNECT_DIST) * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(0,255,136,${alpha})`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw particles
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.5, p.r), 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,255,136,0.35)';
+      ctx.fill();
+    }
+
+    requestAnimationFrame(drawParticles);
+  }
+  drawParticles();
+
+  // ========== Slide Navigation ==========
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  let currentSlide = 0;
+  let isTransitioning = false;
+
+  const progressBar = document.getElementById('progressBar');
+  const counterCurrent = document.getElementById('counterCurrent');
+  const dotNav = document.getElementById('dotNav');
+  const btnPrev = document.getElementById('btnPrev');
+  const btnNext = document.getElementById('btnNext');
+
+  // Create dot buttons
+  for (let i = 0; i < totalSlides; i++) {
+    const dot = document.createElement('button');
+    dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+    dot.addEventListener('click', () => goToSlide(i));
+    dotNav.appendChild(dot);
+  }
+  const dots = dotNav.querySelectorAll('button');
+
+  function updateUI() {
+    // Progress bar
+    const progress = ((currentSlide + 1) / totalSlides) * 100;
+    progressBar.style.width = progress + '%';
+
+    // Counter
+    counterCurrent.textContent = String(currentSlide + 1).padStart(2, '0');
+
+    // Dots
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === currentSlide);
+    });
+
+    // Buttons
+    btnPrev.disabled = currentSlide === 0;
+    btnNext.disabled = currentSlide === totalSlides - 1;
+  }
+
+  function goToSlide(index) {
+    if (isTransitioning || index === currentSlide || index < 0 || index >= totalSlides) return;
+    isTransitioning = true;
+
+    const direction = index > currentSlide ? 1 : -1;
+    const currentEl = slides[currentSlide];
+    const nextEl = slides[index];
+
+    // Reset animations on next slide
+    nextEl.querySelectorAll('.anim-up').forEach(el => {
+      el.style.animation = 'none';
+      el.offsetHeight; // force reflow
+      el.style.animation = '';
+    });
+
+    // Exit current
+    currentEl.classList.remove('active');
+    currentEl.classList.add(direction > 0 ? 'exit-left' : '');
+    if (direction < 0) {
+      currentEl.style.transform = 'translateX(60px)';
+      currentEl.style.opacity = '0';
+    }
+
+    // Enter next
+    if (direction > 0) {
+      nextEl.style.transform = 'translateX(60px)';
+    } else {
+      nextEl.classList.remove('exit-left');
+      nextEl.style.transform = 'translateX(-60px)';
+    }
+    nextEl.style.opacity = '0';
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        nextEl.classList.add('active');
+        nextEl.style.transform = '';
+        nextEl.style.opacity = '';
+      });
+    });
+
+    currentSlide = index;
+    updateUI();
+
+    setTimeout(() => {
+      currentEl.classList.remove('exit-left');
+      currentEl.style.transform = '';
+      currentEl.style.opacity = '';
+      isTransitioning = false;
+    }, 600);
+  }
+
+  btnPrev.addEventListener('click', () => goToSlide(currentSlide - 1));
+  btnNext.addEventListener('click', () => goToSlide(currentSlide + 1));
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      goToSlide(currentSlide + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      goToSlide(currentSlide - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      goToSlide(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      goToSlide(totalSlides - 1);
+    }
+  });
+
+  // Touch support
+  let touchStartX = 0;
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) goToSlide(currentSlide + 1);
+      else goToSlide(currentSlide - 1);
+    }
+  }, { passive: true });
+
+  // Initial UI state
+  updateUI();
+</script>
+</body>
+</html>
